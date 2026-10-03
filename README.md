@@ -32,10 +32,6 @@ For full-screen Fully Kiosk launch shortcuts, use:
 
 Open each page directly and complete HA sign-in once at the new URL before embedding it. The new pages use separate HA session storage to avoid mixing OAuth client IDs with the old `/local` pages. The existing routing API key storage is retained. No credentials are embedded in the repository. Vehicle entities come from the existing pages. External MapLibre, map tiles, and routing services remain their existing dependencies.
 
-## Audio, Whisper, and media frame
-
-The audio and Whisper pages belong to their Docker applications and depend on those applications' APIs. Continue using an iframe card pointed at the existing running server URL. This bundle does not duplicate their server code or change their deployment. The media-frame add-on remains managed through its add-on repository. Native vacuum view YAML can remain in HA; HACS does not update native view layouts.
-
 ## Update
 
 Publish a new version here, install the available HACS update, and reload the dashboard/vehicle page. The vehicle card uses the HACS version tag on its iframe URL so updated HTML receives a new cache key. For direct Fully Kiosk shortcuts, force a page reload or clear its web cache if the old page remains. Integration updates are separate and require an HA restart. This is an update-through-HACS workflow, not unattended installation.
