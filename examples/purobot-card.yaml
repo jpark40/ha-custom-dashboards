@@ -1,0 +1,6 @@
+type: custom:purobot-timeline
+title: Purobot Event Timeline
+initial_category: toilet_used
+refresh_seconds: 15
+thumbnail_width: 170
+page_size: 80

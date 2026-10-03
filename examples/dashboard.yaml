@@ -1,0 +1,38 @@
+# Optional initial dashboard layout. Existing cards/views can keep their YAML.
+title: Home Timelines
+views:
+  - title: Blue Iris
+    path: blue-iris
+    cards:
+      - type: custom:blue-iris-timeline
+        title: Blue Iris AI Timeline
+        initial_category: people
+        refresh_seconds: 15
+        thumbnail_width: 170
+        page_size: 80
+  - title: Purobot
+    path: purobot
+    cards:
+      - type: custom:purobot-timeline
+        title: Purobot Event Timeline
+        initial_category: toilet_used
+        refresh_seconds: 15
+        thumbnail_width: 170
+        page_size: 80
+  - title: Front Door
+    path: front-door
+    cards:
+      - type: custom:front-door-timeline
+        title: Front Door
+        refresh_seconds: 30
+        thumbnail_width: 170
+        show_event_labels: true
+  - title: Vehicles
+    path: vehicles
+    cards:
+      - type: custom:vehicle-status-card
+        vehicle: mousie
+        height: 650
+      - type: custom:vehicle-status-card
+        vehicle: moomoo
+        height: 650
