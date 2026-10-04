@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
+const version = fs.readFileSync(path.join(__dirname, '../VERSION'), 'utf8').trim();
 const source = fs.readFileSync(path.join(__dirname, '../dist/ha-custom-dashboards.js'), 'utf8')
   .replaceAll('import.meta.url', JSON.stringify('https://ha.example/hacsfiles/ha-custom-dashboards/ha-custom-dashboards.js'));
 
@@ -34,12 +35,12 @@ test('vehicle card resolves installed HTML and does not reload on HA state updat
   const {types, context} = registry(); vm.runInContext(source, context);
   const Card = types.get('vehicle-status-card'), card = new Card();
   card.setConfig({vehicle: 'mousie'});
-  assert.equal(card._iframe.src, 'https://ha.example/local/community/ha-custom-dashboards/mousie-status.html?v=1.0.0');
+  assert.equal(card._iframe.src, `https://ha.example/local/community/ha-custom-dashboards/mousie-status.html?v=${version}`);
   const frame = card._iframe;
   card.hass = {states: {}}; card.setConfig({vehicle: 'mousie'});
   assert.equal(card._iframe, frame);
   card.setConfig({vehicle: 'moomoo', height: 900});
-  assert.equal(card._iframe.src, 'https://ha.example/local/community/ha-custom-dashboards/moomoo-status.html?v=1.0.0');
+  assert.equal(card._iframe.src, `https://ha.example/local/community/ha-custom-dashboards/moomoo-status.html?v=${version}`);
   assert.equal(card._iframe.style.height, '900px');
   assert.throws(() => card.setConfig({vehicle: '../other'}));
   assert.throws(() => card.setConfig({vehicle: 'mousie', height: 'bad'}));

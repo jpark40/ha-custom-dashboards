@@ -49,3 +49,11 @@ This is a custom HACS repository; listing in the default HACS catalog is not req
 The repository contains a custom icon in 256px and 512px PNG, with editable SVG source. For integrations, `brand/icon.png` and `brand/icon@2x.png` are bundled inside the integration; Home Assistant 2026.3+ can display these local brand images.
 
 HACS currently uses its external brands source for integration list icons; the open upstream issue https://github.com/hacs/integration/issues/5223 prevents local-only brand assets from reliably appearing there. Dashboard repositories use HACS's generic Dashboard category icon rather than a per-repository custom icon. The artwork is visible in each repository README and is included for supported HA surfaces. No unsupported icon field is added to hacs.json.
+
+## Front door: Eufy SDK migration (1.0.1)
+
+The Front Door card now includes **All**, **Person**, and **Package** tabs. The main snapshot and thumbnails fit the complete image without cropping, using the same bounded viewer size as Blue Iris. Existing card YAML still works; optionally set `initial_category: all`, `person`, or `package`.
+
+Update this dashboard bundle through HACS, then refresh the browser/clear the Fully Kiosk web cache. Replace your existing timeline capture automation with [the new SDK example](https://github.com/jpark40/ha-front-door-timeline/blob/main/examples/automation.yaml), keeping its existing automation ID. Do not add a second capture automation. The example uses `image.front_door_last_event` and `event.front_door_detection`; it captures on the image timestamp changing, rather than capturing the previous thumbnail as soon as detection fires.
+
+The tabs filter saved snapshot labels: Person includes `person` and `stranger`; Package includes delivered, taken, and stranded events. Old `image_update` or `motion` snapshots stay under All because their original category was not saved. They cannot be reliably classified retroactively. The card displays saved history and does not need a camera entity. For separate live-view cards, your migrated camera is `camera.front_door_2`.

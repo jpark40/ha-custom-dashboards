@@ -1,4 +1,4 @@
-const CARD_VERSION = "1.0.4";
+const CARD_VERSION = "__PACKAGE_VERSION__";
 
 class FrontDoorTimelineCard extends HTMLElement {
   constructor() {
@@ -9,6 +9,8 @@ class FrontDoorTimelineCard extends HTMLElement {
     this._payload = undefined;
     this._selectedDate = undefined;
     this._selectedIndex = -1;
+    this._category = "all";
+    this._images = [];
     this._blobUrls = new Map();
     this._blobPromises = new Map();
     this._loadGeneration = 0;
@@ -35,6 +37,8 @@ class FrontDoorTimelineCard extends HTMLElement {
       thumbnail_width: Math.max(120, Number(config.thumbnail_width ?? 170)),
       show_event_labels: config.show_event_labels !== false,
     };
+    this._category = ["all", "person", "package"].includes(config.initial_category)
+      ? config.initial_category : "all";
 
     if (this.isConnected) {
       this._renderShell();
@@ -137,7 +141,8 @@ class FrontDoorTimelineCard extends HTMLElement {
         .viewer {
           position: relative;
           margin: 0 16px;
-          min-height: min(240px, 42vh);
+          height: clamp(220px, 48vh, 680px);
+          min-height: 0;
           border-radius: 12px;
           overflow: hidden;
           background: #111;
@@ -147,8 +152,8 @@ class FrontDoorTimelineCard extends HTMLElement {
         .viewer img {
           display: block;
           width: 100%;
-          height: auto;
-          max-height: 70vh;
+          height: 100%;
+          max-height: 100%;
           object-fit: contain;
           object-position: center;
           opacity: 0;
@@ -308,9 +313,15 @@ class FrontDoorTimelineCard extends HTMLElement {
           .date-controls { width: 100%; }
           .date-input { flex: 1; min-width: 0; }
           .latest-button { display: none; }
-          .viewer { margin: 0 10px; border-radius: 9px; }
+          .viewer { margin: 0 10px; border-radius: 9px; height: 32vh; min-height: 190px; }
           .timeline-wrap { padding-left: 10px; padding-right: 10px; }
         }
+        [hidden] { display: none !important; }
+        .thumb img { object-fit: contain; }
+        .tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 0 16px 14px; }
+        .tab { min-height: 48px; border: 0; border-bottom: 3px solid transparent; border-radius: 9px 9px 0 0; background: var(--secondary-background-color); color: var(--secondary-text-color); font: inherit; font-weight: 600; cursor: pointer; }
+        .tab[aria-selected="true"] { border-color: var(--primary-color); color: var(--primary-color); }
+        button:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
       </style>
       <ha-card>
         <div class="header">
@@ -325,6 +336,11 @@ class FrontDoorTimelineCard extends HTMLElement {
             <button class="latest-button" title="Jump to latest date">Latest</button>
             <button class="icon-button refresh" aria-label="Refresh" title="Refresh"><ha-icon icon="mdi:refresh"></ha-icon></button>
           </div>
+        </div>
+        <div class="tabs" role="tablist" aria-label="Front door event categories">
+          <button class="tab" role="tab" data-category="all">All</button>
+          <button class="tab" role="tab" data-category="person">Person</button>
+          <button class="tab" role="tab" data-category="package">Package</button>
         </div>
         <div class="viewer">
           <img class="main-image" alt="Selected front door snapshot">
@@ -365,6 +381,20 @@ class FrontDoorTimelineCard extends HTMLElement {
     };
 
     this._els.title.textContent = this._config.title;
+    this.shadowRoot.querySelectorAll(".tab").forEach((tab, index, tabs) => {
+      tab.addEventListener("click", () => {
+        const previousId = this._images[this._selectedIndex]?.id;
+        this._category = tab.dataset.category;
+        this._closeOverlay();
+        this._renderTimeline(previousId);
+      });
+      tab.addEventListener("keydown", (event) => {
+        const next = event.key === "ArrowRight" ? (index + 1) % tabs.length
+          : event.key === "ArrowLeft" ? (index + tabs.length - 1) % tabs.length
+          : event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : undefined;
+        if (next !== undefined) { event.preventDefault(); tabs[next].focus(); tabs[next].click(); }
+      });
+    });
     this._els.date.addEventListener("change", () => {
       this._load(this._els.date.value || undefined);
     });
@@ -381,7 +411,7 @@ class FrontDoorTimelineCard extends HTMLElement {
       } else if (event.key === "ArrowRight") {
         event.preventDefault();
         this._selectIndex(
-          Math.min((this._payload?.images.length || 1) - 1, this._selectedIndex + 1),
+          Math.min((this._images.length || 1) - 1, this._selectedIndex + 1),
           true
         );
       }
@@ -407,7 +437,7 @@ class FrontDoorTimelineCard extends HTMLElement {
     if (!this._hass || !this._config || !this._els) return;
     const generation = ++this._loadGeneration;
     const previousId = preserveSelection
-      ? this._payload?.images?.[this._selectedIndex]?.id
+      ? this._images[this._selectedIndex]?.id
       : undefined;
 
     this._els.refresh.disabled = true;
@@ -465,7 +495,12 @@ class FrontDoorTimelineCard extends HTMLElement {
     this._observer = undefined;
     this._els.timeline.replaceChildren();
 
-    const images = this._payload?.images || [];
+    const images = this._images = this._filterImages(this._payload?.images || []);
+    this.shadowRoot.querySelectorAll(".tab").forEach((tab) => {
+      const active = tab.dataset.category === this._category;
+      tab.setAttribute("aria-selected", String(active));
+      tab.tabIndex = active ? 0 : -1;
+    });
     const dateLabel = this._formatDate(this._selectedDate);
     this._els.count.textContent = `${images.length} snapshot${images.length === 1 ? "" : "s"} · ${dateLabel}`;
 
@@ -473,7 +508,7 @@ class FrontDoorTimelineCard extends HTMLElement {
       this._selectedIndex = -1;
       this._els.viewer.hidden = true;
       this._els.timelineWrap.hidden = true;
-      this._setMessage(`No snapshots saved for ${dateLabel}.`);
+      this._setMessage(`No ${this._category === "all" ? "" : this._category + " "}snapshots saved for ${dateLabel}.`);
       return;
     }
 
@@ -556,7 +591,7 @@ class FrontDoorTimelineCard extends HTMLElement {
   }
 
   async _selectIndex(index, scrollIntoView = false) {
-    const images = this._payload?.images || [];
+    const images = this._images;
     if (index < 0 || index >= images.length) return;
     this._selectedIndex = index;
 
@@ -588,13 +623,24 @@ class FrontDoorTimelineCard extends HTMLElement {
 
     try {
       const url = await this._loadBlob(item);
-      if (this._payload?.images?.[this._selectedIndex]?.id !== item.id) return;
+      if (this._images[this._selectedIndex]?.id !== item.id) return;
       this._els.mainImage.src = url;
       this._els.mainImage.classList.add("ready");
       this._els.viewerStatus.classList.add("hidden");
     } catch (error) {
+      if (this._images[this._selectedIndex]?.id !== item.id) return;
       this._els.viewerStatus.textContent = `Image could not be loaded: ${error?.message || error}`;
     }
+  }
+
+  _filterImages(images) {
+    if (this._category === "all") return images;
+    return images.filter((item) => {
+      const label = String(item.label || "").toLowerCase().replace(/[_-]/g, " ");
+      return this._category === "person"
+        ? /^(person|stranger)( |$)/.test(label)
+        : /^package( |$)/.test(label);
+    });
   }
 
   async _loadBlob(item) {
