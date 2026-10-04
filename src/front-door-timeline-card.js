@@ -17,6 +17,10 @@ class FrontDoorTimelineCard extends HTMLElement {
     this._rendered = false;
     this._timer = undefined;
     this._observer = undefined;
+    this._pointers = new Map();
+    this._zoom = {scale: 1, x: 0, y: 0};
+    this._overlayReady = false;
+    this._overlayBusy = false;
   }
 
   static getStubConfig() {
@@ -56,6 +60,7 @@ class FrontDoorTimelineCard extends HTMLElement {
   connectedCallback() {
     if (!this._config) return;
     if (!this._rendered) this._renderShell();
+    if (this._els?.["overlay-stage"]) this._resizeObserver?.observe(this._els["overlay-stage"]);
     this._startTimer();
     if (this._hass && !this._payload) this._load();
   }
@@ -65,6 +70,8 @@ class FrontDoorTimelineCard extends HTMLElement {
     this._timer = undefined;
     if (this._observer) this._observer.disconnect();
     this._observer = undefined;
+    this._closeOverlay(false);
+    this._resizeObserver?.disconnect();
     this._releaseBlobs();
   }
 
@@ -73,6 +80,7 @@ class FrontDoorTimelineCard extends HTMLElement {
   }
 
   _renderShell() {
+    this._resizeObserver?.disconnect();
     this._rendered = true;
     this.shadowRoot.innerHTML = `
       <style>
@@ -316,6 +324,45 @@ class FrontDoorTimelineCard extends HTMLElement {
           .viewer { margin: 0 10px; border-radius: 9px; height: 32vh; min-height: 190px; }
           .timeline-wrap { padding-left: 10px; padding-right: 10px; }
         }
+        .overlay-stage {
+          position: absolute;
+          inset: max(68px, calc(env(safe-area-inset-top) + 56px)) 0 max(42px, calc(env(safe-area-inset-bottom) + 30px));
+          overflow: hidden;
+          touch-action: none;
+          user-select: none;
+          -webkit-user-select: none;
+          cursor: grab;
+        }
+        .overlay-stage:active { cursor: grabbing; }
+        .overlay-image {
+          width: 100%; height: 100%; display: block;
+          object-fit: contain; transform-origin: center;
+          pointer-events: none; -webkit-user-drag: none;
+        }
+        .overlay-toolbar {
+          position: absolute;
+          top: max(10px, env(safe-area-inset-top));
+          left: 14px; right: 14px;
+          display: flex; align-items: center; gap: 8px;
+        }
+        .overlay-caption { flex: 1; min-width: 0; color: #fff; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .overlay button {
+          flex: 0 0 auto;
+          width: 44px; height: 44px;
+          border: 0; border-radius: 50%;
+          color: #fff; background: rgba(60,60,60,.85); cursor: pointer;
+          display: grid; place-items: center;
+        }
+        .overlay button:disabled { opacity: .3; cursor: default; }
+        .overlay-previous, .overlay-next {
+          position: absolute;
+          top: calc(50% - 22px);
+        }
+        .overlay-previous { left: 10px; }
+        .overlay-next { right: 10px; }
+
+        .overlay-close { position: static; }
+        .overlay-status { position: absolute; inset: 0; display: grid; place-items: center; color: #fff; padding: 24px; text-align: center; pointer-events: none; }
         [hidden] { display: none !important; }
         .thumb img { object-fit: contain; }
         .tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 0 16px 14px; }
@@ -343,7 +390,7 @@ class FrontDoorTimelineCard extends HTMLElement {
           <button class="tab" role="tab" data-category="package">Package</button>
         </div>
         <div class="viewer">
-          <img class="main-image" alt="Selected front door snapshot">
+          <img class="main-image" tabindex="0" role="button" aria-label="Open full-size snapshot" alt="Selected front door snapshot">
           <div class="viewer-status">Loading snapshots…</div>
           <div class="stamp" hidden></div>
         </div>
@@ -354,8 +401,10 @@ class FrontDoorTimelineCard extends HTMLElement {
         <div class="message" hidden></div>
       </ha-card>
       <div class="overlay" role="dialog" aria-modal="true" aria-label="Full-size front door snapshot">
-        <img alt="Full-size front door snapshot">
-        <button class="overlay-close" aria-label="Close"><ha-icon icon="mdi:close"></ha-icon></button>
+        <div class="overlay-stage"><img class="overlay-image" draggable="false" alt="Full-size front door snapshot"><div class="overlay-status" role="status" hidden></div></div>
+        <div class="overlay-toolbar"><span class="overlay-caption" aria-live="polite"></span><button class="overlay-reset" aria-label="Reset image zoom"><ha-icon icon="mdi:magnify-minus-outline"></ha-icon></button><button class="overlay-close" aria-label="Close"><ha-icon icon="mdi:close"></ha-icon></button></div>
+        <button class="overlay-previous" aria-label="Previous snapshot"><ha-icon icon="mdi:chevron-left"></ha-icon></button>
+        <button class="overlay-next" aria-label="Next snapshot"><ha-icon icon="mdi:chevron-right"></ha-icon></button>
       </div>
     `;
 
@@ -376,10 +425,13 @@ class FrontDoorTimelineCard extends HTMLElement {
       railLine: this.shadowRoot.querySelector(".rail-line"),
       message: this.shadowRoot.querySelector(".message"),
       overlay: this.shadowRoot.querySelector(".overlay"),
-      overlayImage: this.shadowRoot.querySelector(".overlay img"),
+      overlayImage: this.shadowRoot.querySelector(".overlay-image"),
       overlayClose: this.shadowRoot.querySelector(".overlay-close"),
     };
 
+    for (const name of ["overlay-stage", "overlay-image", "overlay-status", "overlay-caption", "overlay-reset", "overlay-previous", "overlay-next"]) this._els[name] = this.shadowRoot.querySelector(`.${name}`);
+    this._els["main-image"] = this._els.mainImage;
+    this._els["overlay-close"] = this._els.overlayClose;
     this._els.title.textContent = this._config.title;
     this.shadowRoot.querySelectorAll(".tab").forEach((tab, index, tabs) => {
       tab.addEventListener("click", () => {
@@ -417,6 +469,26 @@ class FrontDoorTimelineCard extends HTMLElement {
       }
     });
     this._els.mainImage.addEventListener("click", () => this._openOverlay());
+    this._els.mainImage.addEventListener("keydown", event => {
+      if (event.key === "Enter" || event.key === " ") { event.preventDefault(); this._openOverlay(); }
+    });
+    this._els.overlay.addEventListener("keydown", event => this._overlayKeyDown(event));
+    this._els["overlay-reset"].onclick = () => this._resetZoom();
+    this._els["overlay-previous"].onclick = () => this._navigateOverlay(-1);
+    this._els["overlay-next"].onclick = () => this._navigateOverlay(1);
+    const stage = this._els["overlay-stage"];
+    stage.addEventListener("pointerdown", event => this._pointerDown(event));
+    stage.addEventListener("pointermove", event => this._pointerMove(event));
+    for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) stage.addEventListener(type, event => this._pointerEnd(event));
+    stage.addEventListener("wheel", event => this._wheelZoom(event), {passive: false});
+    stage.addEventListener("dragstart", event => event.preventDefault());
+    this._els["overlay-image"].onload = () => {
+      if (this._els["overlay-image"].getAttribute("src")) { this._overlayReady = true; this._applyZoom(); }
+    };
+    if (window.ResizeObserver) {
+      this._resizeObserver = new ResizeObserver(() => this._applyZoom());
+      this._resizeObserver.observe(stage);
+    }
     this._els.overlayClose.addEventListener("click", () => this._closeOverlay());
     this._els.overlay.addEventListener("click", (event) => {
       if (event.target === this._els.overlay) this._closeOverlay();
@@ -434,7 +506,7 @@ class FrontDoorTimelineCard extends HTMLElement {
   }
 
   async _load(date, preserveSelection = false) {
-    if (!this._hass || !this._config || !this._els) return;
+    if (!this._hass || !this._config || !this._els || this._els.overlay.classList.contains("open")) return;
     const generation = ++this._loadGeneration;
     const previousId = preserveSelection
       ? this._images[this._selectedIndex]?.id
@@ -615,6 +687,7 @@ class FrontDoorTimelineCard extends HTMLElement {
     }
 
     const item = images[index];
+    if (this._els.overlay.classList.contains("open")) this._prepareOverlayImage();
     this._els.mainImage.classList.remove("ready");
     this._els.viewerStatus.textContent = "Loading image…";
     this._els.viewerStatus.classList.remove("hidden");
@@ -627,9 +700,11 @@ class FrontDoorTimelineCard extends HTMLElement {
       this._els.mainImage.src = url;
       this._els.mainImage.classList.add("ready");
       this._els.viewerStatus.classList.add("hidden");
+      if (this._els.overlay.classList.contains("open")) this._showOverlayImage();
     } catch (error) {
       if (this._images[this._selectedIndex]?.id !== item.id) return;
       this._els.viewerStatus.textContent = `Image could not be loaded: ${error?.message || error}`;
+      if (this._els.overlay.classList.contains("open")) this._els["overlay-status"].textContent = this._els.viewerStatus.textContent;
     }
   }
 
@@ -672,15 +747,135 @@ class FrontDoorTimelineCard extends HTMLElement {
   }
 
   _openOverlay() {
-    if (this._selectedIndex < 0 || !this._els.mainImage.src) return;
-    this._els.overlayImage.src = this._els.mainImage.src;
-    this._els.overlay.classList.add("open");
-    this._els.overlayClose.focus({ preventScroll: true });
+    if (this._selectedIndex < 0 || !this._els["main-image"].classList.contains("ready")) return;
+    this._els.overlay.classList.add("open"); this._showOverlayImage(); this._els["overlay-close"].focus({preventScroll: true});
   }
-
-  _closeOverlay() {
-    this._els.overlay.classList.remove("open");
-    this._els.overlayImage.removeAttribute("src");
+  _closeOverlay(focus = true) {
+    if (!this._els?.overlay) return;
+    const open = this._els.overlay.classList.contains("open"); this._els.overlay.classList.remove("open");
+    this._els["overlay-image"].removeAttribute("src"); this._overlayReady = false; this._clearPointers();
+    if (open && focus) this._els["main-image"].focus({preventScroll: true});
+  }
+  _prepareOverlayImage() {
+    this._els["overlay-image"].removeAttribute("src"); this._overlayReady = false; this._resetZoom();
+    this._els["overlay-status"].textContent = "Loading image…"; this._els["overlay-status"].hidden = false;
+    this._syncOverlay();
+  }
+  _showOverlayImage() {
+    this._resetZoom();
+    const img = this._els["overlay-image"], main = this._els["main-image"];
+    img.src = main.src; img.alt = main.alt; this._els["overlay-status"].hidden = true;
+    this._overlayReady = img.complete && img.naturalWidth > 0;
+    this._syncOverlay(); this._applyZoom();
+  }
+  _syncOverlay() {
+    if (!this._els?.["overlay-caption"]) return;
+    const images = this._images, item = images[this._selectedIndex];
+    this._els["overlay-caption"].textContent = item ? `${this._formatDate(item.date)} · ${this._formatTime(item.time)} · ${item.label} · ${this._selectedIndex + 1}/${images.length}` : "";
+    this._els["overlay-previous"].disabled = this._overlayBusy || this._selectedIndex <= 0;
+    this._els["overlay-next"].disabled = this._overlayBusy || this._selectedIndex >= images.length - 1;
+    this._els["overlay-reset"].disabled = this._overlayBusy || this._zoom.scale <= 1;
+    this._els["overlay-reset"].title = `Reset zoom (${Math.round(this._zoom.scale * 100)}%)`;
+  }
+  async _navigateOverlay(direction) {
+    if (!this._els.overlay.classList.contains("open") || this._overlayBusy) return;
+    const next = this._selectedIndex + direction;
+    if (next < 0 || next >= this._images.length) return;
+    this._overlayBusy = true; this._syncOverlay();
+    try { await this._selectIndex(next, true); }
+    finally { this._overlayBusy = false; this._syncOverlay(); }
+  }
+  _overlayKeyDown(event) {
+    if (event.key === "Escape") { event.preventDefault(); this._closeOverlay(); }
+    else if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+      event.preventDefault(); this._navigateOverlay(event.key === "ArrowLeft" ? -1 : 1);
+    } else if (event.key === "0") { event.preventDefault(); this._resetZoom(); }
+    else if (event.key === "Tab") {
+      const buttons = [...this._els.overlay.querySelectorAll("button:not([disabled])")];
+      if (!buttons.length) return;
+      event.preventDefault();
+      const index = buttons.indexOf(this.shadowRoot.activeElement);
+      buttons[(index + (event.shiftKey ? -1 : 1) + buttons.length) % buttons.length].focus({preventScroll: true});
+    }
+  }
+  _clearPointers() {
+    const ids = [...this._pointers.keys()]; this._pointers.clear(); this._gesture = null; this._hadPinch = false;
+    const stage = this._els?.["overlay-stage"];
+    for (const id of ids) { try { if (stage?.hasPointerCapture(id)) stage.releasePointerCapture(id); } catch (_) {} }
+  }
+  _resetZoom() { this._clearPointers(); this._zoom = {scale: 1, x: 0, y: 0}; this._applyZoom(); }
+  _applyZoom() {
+    const stage = this._els?.["overlay-stage"], img = this._els?.["overlay-image"];
+    if (!stage || !img) return;
+    const width = stage.clientWidth, height = stage.clientHeight;
+    if (!width || !height) return; // ResizeObserver also fires when the viewer is hidden.
+    const ratio = img.naturalWidth && img.naturalHeight ? img.naturalWidth / img.naturalHeight : width / (height || 1);
+    const fittedWidth = Math.min(width, height * ratio), fittedHeight = Math.min(height, width / ratio);
+    this._zoom.scale = Math.max(1, Math.min(8, this._zoom.scale));
+    if (this._zoom.scale < 1.01) this._zoom.scale = 1;
+    const boundX = Math.max(0, (fittedWidth * this._zoom.scale - width) / 2), boundY = Math.max(0, (fittedHeight * this._zoom.scale - height) / 2);
+    this._zoom.x = Math.max(-boundX, Math.min(boundX, this._zoom.x));
+    this._zoom.y = Math.max(-boundY, Math.min(boundY, this._zoom.y));
+    img.style.transform = `translate(${this._zoom.x}px, ${this._zoom.y}px) scale(${this._zoom.scale})`;
+    this._syncOverlay();
+  }
+  _stagePoint(x, y) {
+    const rect = this._els["overlay-stage"].getBoundingClientRect();
+    return {x: x - rect.left - rect.width / 2, y: y - rect.top - rect.height / 2};
+  }
+  _beginGesture() {
+    const points = [...this._pointers.values()], first = points[0];
+    if (!first) { this._gesture = null; return; }
+    if (points.length >= 2) {
+      this._hadPinch = true;
+      const second = points[1], center = this._stagePoint((first.x + second.x) / 2, (first.y + second.y) / 2);
+      this._gesture = {mode: "pinch", distance: Math.max(1, Math.hypot(first.x - second.x, first.y - second.y)),
+        scale: this._zoom.scale, anchorX: (center.x - this._zoom.x) / this._zoom.scale, anchorY: (center.y - this._zoom.y) / this._zoom.scale};
+    } else this._gesture = {mode: this._zoom.scale > 1 || this._hadPinch ? "pan" : "swipe",
+      x: first.x, y: first.y, zoomX: this._zoom.x, zoomY: this._zoom.y, time: performance.now()};
+  }
+  _pointerDown(event) {
+    if (!this._els.overlay.classList.contains("open") || !this._overlayReady || this._overlayBusy || (event.pointerType === "mouse" && event.button !== 0)) return;
+    event.preventDefault();
+    if (!this._pointers.size) this._hadPinch = false;
+    this._pointers.set(event.pointerId, {x: event.clientX, y: event.clientY});
+    try { this._els["overlay-stage"].setPointerCapture(event.pointerId); } catch (_) {}
+    this._beginGesture();
+  }
+  _pointerMove(event) {
+    if (!this._pointers.has(event.pointerId)) return;
+    event.preventDefault(); this._pointers.set(event.pointerId, {x: event.clientX, y: event.clientY});
+    const points = [...this._pointers.values()], gesture = this._gesture;
+    if (gesture?.mode === "pinch" && points.length >= 2) {
+      const [a, b] = points, center = this._stagePoint((a.x + b.x) / 2, (a.y + b.y) / 2);
+      const scale = Math.max(1, Math.min(8, gesture.scale * Math.hypot(a.x - b.x, a.y - b.y) / gesture.distance));
+      this._zoom = {scale, x: center.x - gesture.anchorX * scale, y: center.y - gesture.anchorY * scale};
+      this._applyZoom();
+    } else if (gesture?.mode === "pan") {
+      this._zoom.x = gesture.zoomX + points[0].x - gesture.x; this._zoom.y = gesture.zoomY + points[0].y - gesture.y; this._applyZoom();
+    }
+  }
+  _pointerEnd(event) {
+    if (!this._pointers.has(event.pointerId)) return;
+    if (event.type === "pointerup") this._pointerMove(event);
+    const point = this._pointers.get(event.pointerId), gesture = this._gesture;
+    const dx = (event.type === "pointerup" ? event.clientX : point.x) - (gesture?.x ?? point.x);
+    const dy = (event.type === "pointerup" ? event.clientY : point.y) - (gesture?.y ?? point.y);
+    const swipe = event.type === "pointerup" && this._pointers.size === 1 && !this._hadPinch && gesture?.mode === "swipe" &&
+      performance.now() - gesture.time < 1200 && Math.abs(dx) >= Math.max(48, Math.min(100, this._els["overlay-stage"].clientWidth * .12)) && Math.abs(dx) > Math.abs(dy) * 1.3;
+    if (event.type !== "pointerup") this._hadPinch = true; // A canceled touch must never turn into a swipe.
+    this._pointers.delete(event.pointerId);
+    if (this._pointers.size) this._beginGesture(); else this._clearPointers();
+    if (swipe) this._navigateOverlay(dx < 0 ? 1 : -1);
+  }
+  _wheelZoom(event) {
+    if (!this._overlayReady || this._overlayBusy || !this._els.overlay.classList.contains("open") || this._pointers.size) return;
+    event.preventDefault();
+    const center = this._stagePoint(event.clientX, event.clientY), old = this._zoom;
+    const delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? this._els["overlay-stage"].clientHeight : 1);
+    const scale = Math.max(1, Math.min(8, old.scale * Math.exp(-delta * .002)));
+    this._zoom = {scale, x: center.x - (center.x - old.x) / old.scale * scale, y: center.y - (center.y - old.y) / old.scale * scale};
+    this._applyZoom();
   }
 
   _setMessage(text, error = false) {

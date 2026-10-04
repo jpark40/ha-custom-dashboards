@@ -31,7 +31,7 @@ test('late full-image response cannot replace an image after category switch', a
   let resolve;
   c._loadBlob = () => new Promise(r => {resolve = r;});
   const classes = {remove() {}, add() {}};
-  c._els = {timeline:{querySelectorAll:()=>[]},mainImage:{classList:classes},viewerStatus:{classList:classes},stamp:{}};
+  c._els = {timeline:{querySelectorAll:()=>[]},mainImage:{classList:classes},viewerStatus:{classList:classes},stamp:{},overlay:{classList:{contains:()=>false}}};
   const pending = c._selectIndex(0);
   c._images = [{id:'package'}];
   resolve('blob:old-person'); await pending;
