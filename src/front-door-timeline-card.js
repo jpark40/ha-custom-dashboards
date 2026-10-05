@@ -158,9 +158,13 @@ class FrontDoorTimelineCard extends HTMLElement {
           place-items: center;
         }
         .viewer img {
+          position: absolute;
+          inset: 0;
           display: block;
           width: 100%;
           height: 100%;
+          min-width: 0;
+          min-height: 0;
           max-height: 100%;
           object-fit: contain;
           object-position: center;
@@ -235,10 +239,12 @@ class FrontDoorTimelineCard extends HTMLElement {
           background: var(--secondary-background-color);
         }
         .thumb img {
+          position: absolute;
+          inset: 0;
           width: 100%;
           height: 100%;
           display: block;
-          object-fit: cover;
+          object-fit: contain;
           opacity: 0;
           transition: opacity .15s ease;
         }
@@ -364,7 +370,6 @@ class FrontDoorTimelineCard extends HTMLElement {
         .overlay-close { position: static; }
         .overlay-status { position: absolute; inset: 0; display: grid; place-items: center; color: #fff; padding: 24px; text-align: center; pointer-events: none; }
         [hidden] { display: none !important; }
-        .thumb img { object-fit: contain; }
         .tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 0 16px 14px; }
         .tab { min-height: 48px; border: 0; border-bottom: 3px solid transparent; border-radius: 9px 9px 0 0; background: var(--secondary-background-color); color: var(--secondary-text-color); font: inherit; font-weight: 600; cursor: pointer; }
         .tab[aria-selected="true"] { border-color: var(--primary-color); color: var(--primary-color); }

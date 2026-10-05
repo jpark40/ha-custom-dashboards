@@ -61,3 +61,7 @@ The tabs filter saved snapshot labels: Person includes `person` and `stranger`; 
 ## Front Door touch viewer (1.0.2)
 
 Tap the main snapshot to open the full-size viewer. Swipe left/right for the next/previous snapshot within the selected date and tab. Pinch to zoom up to 8×; drag to pan while zoomed. Mouse wheel zoom, arrow keys, previous/next buttons, a reset-zoom button (or `0`), and Escape to close are supported. Zoom resets on snapshot changes. Automatic refresh pauses while the viewer is open. Update the dashboard bundle in HACS and refresh the browser or clear Fully Kiosk's web cache; card YAML and the backend do not need changes.
+
+## Front Door image fit (1.0.3)
+
+The main timeline snapshot and thumbnails are sized against the viewer bounds, so tall images fit completely without the grid stretching their image box. The full snapshot remains visible with letterboxing as needed. Update the dashboard bundle through HACS and refresh the browser or clear the Fully Kiosk web cache.
