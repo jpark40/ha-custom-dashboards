@@ -2,7 +2,7 @@
 
 ![Repository icon](icon.png)
 
-Version 1.0.0 packages the existing Blue Iris v1.1.0, Purobot v1.0.3, and Front Door v1.0.4 cards into one JavaScript module. It includes the latest recovered Mousie and Moo Moo HTML pages. Timeline card names, API routes, settings, and UI behavior are retained. Purobot retains Toilet Used first and the scale-to-fit viewer; Blue Iris retains Delivery, swipe, and zoom.
+Version 1.0.4 packages the existing Blue Iris v1.1.0, Purobot v1.0.3, and Front Door v1.0.5 cards into one JavaScript module. It includes the latest recovered Mousie and Moo Moo HTML pages. Timeline card names, API routes, settings, and UI behavior are retained. Purobot retains Toilet Used first and the scale-to-fit viewer; Blue Iris retains Delivery, swipe, and zoom.
 
 ## Install or migrate once
 
@@ -52,11 +52,11 @@ HACS currently uses its external brands source for integration list icons; the o
 
 ## Front door: Eufy SDK migration (1.0.1)
 
-The Front Door card now includes **All**, **Person**, and **Package** tabs. The main snapshot and thumbnails fit the complete image without cropping, using the same bounded viewer size as Blue Iris. Existing card YAML still works; optionally set `initial_category: all`, `person`, or `package`.
+The Front Door card now shows **Person** and **Package** tabs, with Person selected by default. Detection labels from `event.front_door_detection` route person and stranger snapshots to Person and package delivery, taken, or stranded snapshots to Package. The main snapshot and thumbnails fit the complete image without cropping, using the same bounded viewer size as Blue Iris. You can set `initial_category: person` or `package`.
 
 Update this dashboard bundle through HACS, then refresh the browser/clear the Fully Kiosk web cache. Replace your existing timeline capture automation with [the new SDK example](https://github.com/jpark40/ha-front-door-timeline/blob/main/examples/automation.yaml), keeping its existing automation ID. Do not add a second capture automation. The example uses `image.front_door_last_event` and `event.front_door_detection`; it captures on the image timestamp changing, rather than capturing the previous thumbnail as soon as detection fires.
 
-The tabs filter saved snapshot labels: Person includes `person` and `stranger`; Package includes delivered, taken, and stranded events. Old `image_update` or `motion` snapshots stay under All because their original category was not saved. They cannot be reliably classified retroactively. The card displays saved history and does not need a camera entity. For separate live-view cards, your migrated camera is `camera.front_door_2`.
+The tabs filter saved snapshot labels: Person includes `person` and `stranger`; Package includes delivered, taken, and stranded events. Old `image_update` or `motion` snapshots do not appear in either tab because their original category was not saved, and cannot be reliably classified retroactively. The card displays saved history and does not need a camera entity. For separate live-view cards, your migrated camera is `camera.front_door_2`.
 
 ## Front Door touch viewer (1.0.2)
 

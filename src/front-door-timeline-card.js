@@ -9,7 +9,7 @@ class FrontDoorTimelineCard extends HTMLElement {
     this._payload = undefined;
     this._selectedDate = undefined;
     this._selectedIndex = -1;
-    this._category = "all";
+    this._category = "person";
     this._images = [];
     this._blobUrls = new Map();
     this._blobPromises = new Map();
@@ -41,8 +41,8 @@ class FrontDoorTimelineCard extends HTMLElement {
       thumbnail_width: Math.max(120, Number(config.thumbnail_width ?? 170)),
       show_event_labels: config.show_event_labels !== false,
     };
-    this._category = ["all", "person", "package"].includes(config.initial_category)
-      ? config.initial_category : "all";
+    this._category = ["person", "package"].includes(config.initial_category)
+      ? config.initial_category : "person";
 
     if (this.isConnected) {
       this._renderShell();
@@ -370,7 +370,7 @@ class FrontDoorTimelineCard extends HTMLElement {
         .overlay-close { position: static; }
         .overlay-status { position: absolute; inset: 0; display: grid; place-items: center; color: #fff; padding: 24px; text-align: center; pointer-events: none; }
         [hidden] { display: none !important; }
-        .tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 0 16px 14px; }
+        .tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin: 0 16px 14px; }
         .tab { min-height: 48px; border: 0; border-bottom: 3px solid transparent; border-radius: 9px 9px 0 0; background: var(--secondary-background-color); color: var(--secondary-text-color); font: inherit; font-weight: 600; cursor: pointer; }
         .tab[aria-selected="true"] { border-color: var(--primary-color); color: var(--primary-color); }
         button:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
@@ -390,7 +390,6 @@ class FrontDoorTimelineCard extends HTMLElement {
           </div>
         </div>
         <div class="tabs" role="tablist" aria-label="Front door event categories">
-          <button class="tab" role="tab" data-category="all">All</button>
           <button class="tab" role="tab" data-category="person">Person</button>
           <button class="tab" role="tab" data-category="package">Package</button>
         </div>
@@ -585,7 +584,7 @@ class FrontDoorTimelineCard extends HTMLElement {
       this._selectedIndex = -1;
       this._els.viewer.hidden = true;
       this._els.timelineWrap.hidden = true;
-      this._setMessage(`No ${this._category === "all" ? "" : this._category + " "}snapshots saved for ${dateLabel}.`);
+      this._setMessage(`No ${this._category} snapshots saved for ${dateLabel}.`);
       return;
     }
 
@@ -714,7 +713,6 @@ class FrontDoorTimelineCard extends HTMLElement {
   }
 
   _filterImages(images) {
-    if (this._category === "all") return images;
     return images.filter((item) => {
       const label = String(item.label || "").toLowerCase().replace(/[_-]/g, " ");
       return this._category === "person"

@@ -12,17 +12,24 @@ function card() {
   });
   return new Card();
 }
-test('categories preserve old history and separate person from all package types', () => {
+test('Person is the default and Person and Package separate detections by event type', () => {
   const c = card();
   const images = ['Image Update', 'Motion', 'Person', 'Stranger', 'Package Delivered', 'Package Taken', 'Package Stranded']
     .map((label, id) => ({label, id}));
-  assert.equal(c._filterImages(images).length, 7);
+  assert.equal(c._category, 'person');
+  assert.deepEqual(Array.from(c._filterImages(images), i => i.id), [2, 3]);
+  c.setConfig({initial_category: 'all'});
+  assert.equal(c._category, 'person');
   c._category = 'person';
   assert.deepEqual(Array.from(c._filterImages(images), i => i.id), [2, 3]);
   c._category = 'package';
   assert.deepEqual(Array.from(c._filterImages(images), i => i.id), [4, 5, 6]);
   assert.equal(c._filterImages([{label:'package_delivered'}]).length, 1);
   assert.equal(c._filterImages([{label:'image_update'}]).length, 0);
+  assert.equal(c._filterImages([{label:'motion'}]).length, 0);
+  assert.match(source, /data-category="person">Person/);
+  assert.match(source, /data-category="package">Package/);
+  assert.doesNotMatch(source, /data-category="all"|>All</);
 });
 test('late full-image response cannot replace an image after category switch', async () => {
   const c = card();
