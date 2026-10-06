@@ -31,9 +31,9 @@ views:
   - title: Vehicles
     path: vehicles
     cards:
-      - type: custom:vehicle-status-card
+      - type: custom:jp-vehicle-status-card
         vehicle: mousie
         height: 650
-      - type: custom:vehicle-status-card
+      - type: custom:jp-vehicle-status-card
         vehicle: moomoo
         height: 650
