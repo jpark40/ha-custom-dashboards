@@ -1,6 +1,6 @@
 // HACS package v1.0.0: existing vehicle pages hosted alongside the cards.
 const PACKAGE_VERSION = "__PACKAGE_VERSION__";
-class VehicleStatusCard extends HTMLElement {
+class JpVehicleStatusCard extends HTMLElement {
   constructor() { super(); this.attachShadow({mode: "open"}); }
   setConfig(config) {
     if (!["mousie", "moomoo"].includes(config?.vehicle)) throw new Error('vehicle must be mousie or moomoo');
@@ -27,4 +27,4 @@ class VehicleStatusCard extends HTMLElement {
   getCardSize() { return Math.ceil((this._config?.height ?? 650) / 50); }
   static getStubConfig() { return {vehicle: 'mousie', height: 650}; }
 }
-if (!customElements.get('vehicle-status-card')) customElements.define('vehicle-status-card', VehicleStatusCard);
+if (!customElements.get('jp-vehicle-status-card')) customElements.define('jp-vehicle-status-card', JpVehicleStatusCard);
