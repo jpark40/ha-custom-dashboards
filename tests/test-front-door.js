@@ -29,7 +29,23 @@ test('Person is the default and Person and Package separate detections by event 
   assert.equal(c._filterImages([{label:'motion'}]).length, 0);
   assert.match(source, /data-category="person">Person/);
   assert.match(source, /data-category="package">Package/);
+  assert.match(source, /<span class="badge">0<\/span>/);
   assert.doesNotMatch(source, /data-category="all"|>All</);
+});
+test('tab badges show all-history category totals returned by the timeline API', () => {
+  const c = card();
+  const tabs = ['person', 'package'].map(category => ({
+    dataset: {category},
+    setAttribute(name, value) { this[name] = value; },
+    querySelector() { return this.badge; },
+    badge: {textContent: ''},
+  }));
+  c.shadowRoot = {querySelectorAll: () => tabs};
+  c._category = 'package';
+  c._payload = {counts: {person: 12, package: 7}};
+  c._syncTabs();
+  assert.deepEqual(tabs.map(tab => tab.badge.textContent), [12, 7]);
+  assert.deepEqual(tabs.map(tab => tab.tabIndex), [-1, 0]);
 });
 test('late full-image response cannot replace an image after category switch', async () => {
   const c = card();

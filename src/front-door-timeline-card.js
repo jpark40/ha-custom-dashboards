@@ -373,6 +373,7 @@ class FrontDoorTimelineCard extends HTMLElement {
         .tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin: 0 16px 14px; }
         .tab { min-height: 48px; border: 0; border-bottom: 3px solid transparent; border-radius: 9px 9px 0 0; background: var(--secondary-background-color); color: var(--secondary-text-color); font: inherit; font-weight: 600; cursor: pointer; }
         .tab[aria-selected="true"] { border-color: var(--primary-color); color: var(--primary-color); }
+        .badge { margin-left: 7px; padding: 2px 7px; border-radius: 12px; background: var(--divider-color, #ddd); color: var(--primary-text-color); font-size: 12px; }
         button:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
       </style>
       <ha-card>
@@ -390,8 +391,8 @@ class FrontDoorTimelineCard extends HTMLElement {
           </div>
         </div>
         <div class="tabs" role="tablist" aria-label="Front door event categories">
-          <button class="tab" role="tab" data-category="person">Person</button>
-          <button class="tab" role="tab" data-category="package">Package</button>
+          <button class="tab" role="tab" data-category="person">Person <span class="badge">0</span></button>
+          <button class="tab" role="tab" data-category="package">Package <span class="badge">0</span></button>
         </div>
         <div class="viewer">
           <img class="main-image" tabindex="0" role="button" aria-label="Open full-size snapshot" alt="Selected front door snapshot">
@@ -566,17 +567,22 @@ class FrontDoorTimelineCard extends HTMLElement {
     if (target) this._load(target);
   }
 
+  _syncTabs() {
+    this.shadowRoot.querySelectorAll(".tab").forEach((tab) => {
+      const active = tab.dataset.category === this._category;
+      tab.setAttribute("aria-selected", String(active));
+      tab.tabIndex = active ? 0 : -1;
+      tab.querySelector(".badge").textContent = this._payload?.counts?.[tab.dataset.category] ?? 0;
+    });
+  }
+
   _renderTimeline(previousId) {
     if (this._observer) this._observer.disconnect();
     this._observer = undefined;
     this._els.timeline.replaceChildren();
 
     const images = this._images = this._filterImages(this._payload?.images || []);
-    this.shadowRoot.querySelectorAll(".tab").forEach((tab) => {
-      const active = tab.dataset.category === this._category;
-      tab.setAttribute("aria-selected", String(active));
-      tab.tabIndex = active ? 0 : -1;
-    });
+    this._syncTabs();
     const dateLabel = this._formatDate(this._selectedDate);
     this._els.count.textContent = `${images.length} snapshot${images.length === 1 ? "" : "s"} · ${dateLabel}`;
 
