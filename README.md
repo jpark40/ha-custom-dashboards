@@ -2,7 +2,7 @@
 
 ![Repository icon](icon.png)
 
-Version 1.0.6 packages the existing Blue Iris v1.1.0, Purobot v1.0.3, and Front Door v1.0.5 cards into one JavaScript module. It includes the latest recovered Mousie and Moo Moo HTML pages. Timeline card names, API routes, settings, and UI behavior are retained. Purobot retains Toilet Used first and the scale-to-fit viewer; Blue Iris retains Delivery, swipe, and zoom. Front Door shows all-history Person and Package counts on its tabs.
+Version 1.0.7 packages the existing Blue Iris v1.1.0, Purobot v1.0.3, and Front Door v1.0.5 cards into one JavaScript module. It includes the latest recovered Mousie and Moo Moo HTML pages. Timeline card names, API routes, settings, and UI behavior are retained. Purobot retains Toilet Used first and the scale-to-fit viewer; Blue Iris retains Delivery, swipe, and zoom. Front Door shows all-history Person and Package counts on its tabs.
 
 ## Install or migrate once
 
@@ -20,7 +20,7 @@ The three timeline cards require their existing backend integrations. Install th
 Use a Manual card:
 
 ```yaml
-type: custom:vehicle-status-card
+type: custom:jp-vehicle-status-card
 vehicle: mousie  # or moomoo
 height: 650
 ```
@@ -32,9 +32,13 @@ For full-screen Fully Kiosk launch shortcuts, use:
 
 Open each page directly and complete HA sign-in once at the new URL before embedding it. The new pages use separate HA session storage to avoid mixing OAuth client IDs with the old `/local` pages. The existing routing API key storage is retained. No credentials are embedded in the repository. Vehicle entities come from the existing pages. External MapLibre, map tiles, and routing services remain their existing dependencies.
 
+### Vehicle card name change in 1.0.7
+
+The embedded Mousie/Moo Moo iframe card is now registered as `custom:jp-vehicle-status-card`. Earlier releases used `custom:vehicle-status-card`, which collided with ngocjohn's separate Vehicle Status Card HACS frontend and could produce `CustomElementRegistry` duplicate-registration errors. Existing ngocjohn Vehicle Status Card YAML should remain `custom:vehicle-status-card`. Only cards from this repository that include `vehicle: mousie` or `vehicle: moomoo` should be changed to `custom:jp-vehicle-status-card`.
+
 ## Update
 
-Publish a new version here, install the available HACS update, and reload the dashboard/vehicle page. The vehicle card uses the HACS version tag on its iframe URL so updated HTML receives a new cache key. For direct Fully Kiosk shortcuts, force a page reload or clear its web cache if the old page remains. Integration updates are separate and require an HA restart. This is an update-through-HACS workflow, not unattended installation.
+Publish a new version here, install the available HACS update, and reload the dashboard/vehicle page. The `jp-vehicle-status-card` uses the HACS version tag on its iframe URL so updated HTML receives a new cache key. For direct Fully Kiosk shortcuts, force a page reload or clear its web cache if the old page remains. Integration updates are separate and require an HA restart. This is an update-through-HACS workflow, not unattended installation.
 
 ## Maintainer
 
