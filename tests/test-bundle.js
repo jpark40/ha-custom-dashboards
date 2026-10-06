@@ -26,14 +26,23 @@ function registry() {
 test('single bundle registers each existing card and supports repeated loads', () => {
   const {types, context} = registry();
   vm.runInContext(source, context);
-  assert.deepEqual([...types.keys()], ['blue-iris-timeline', 'purobot-timeline', 'front-door-timeline', 'vehicle-status-card']);
+  assert.deepEqual([...types.keys()], ['blue-iris-timeline', 'purobot-timeline', 'front-door-timeline', 'jp-vehicle-status-card']);
   vm.runInContext(source, context);
   assert.equal(types.size, 4);
 });
 
+test('bundle does not claim the upstream vehicle-status-card custom element', () => {
+  const {types, context} = registry();
+  class UpstreamVehicleStatusCard {}
+  context.customElements.define('vehicle-status-card', UpstreamVehicleStatusCard);
+  vm.runInContext(source, context);
+  assert.equal(types.get('vehicle-status-card'), UpstreamVehicleStatusCard);
+  assert(types.has('jp-vehicle-status-card'));
+});
+
 test('vehicle card resolves installed HTML and does not reload on HA state updates', () => {
   const {types, context} = registry(); vm.runInContext(source, context);
-  const Card = types.get('vehicle-status-card'), card = new Card();
+  const Card = types.get('jp-vehicle-status-card'), card = new Card();
   card.setConfig({vehicle: 'mousie'});
   assert.equal(card._iframe.src, `https://ha.example/local/community/ha-custom-dashboards/mousie-status.html?v=${version}`);
   const frame = card._iframe;
