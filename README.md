@@ -1,8 +1,8 @@
-# Jeff Home Assistant Dashboards
+# Home Assistant Dashboards
 
 ![Repository icon](icon.png)
 
-Version 1.0.5 packages the existing Blue Iris v1.1.0, Purobot v1.0.3, and Front Door v1.0.5 cards into one JavaScript module. It includes the latest recovered Mousie and Moo Moo HTML pages. Timeline card names, API routes, settings, and UI behavior are retained. Purobot retains Toilet Used first and the scale-to-fit viewer; Blue Iris retains Delivery, swipe, and zoom. Front Door shows all-history Person and Package counts on its tabs.
+Version 1.0.6 packages the existing Blue Iris v1.1.0, Purobot v1.0.3, and Front Door v1.0.5 cards into one JavaScript module. It includes the latest recovered Mousie and Moo Moo HTML pages. Timeline card names, API routes, settings, and UI behavior are retained. Purobot retains Toilet Used first and the scale-to-fit viewer; Blue Iris retains Delivery, swipe, and zoom. Front Door shows all-history Person and Package counts on its tabs.
 
 ## Install or migrate once
 
