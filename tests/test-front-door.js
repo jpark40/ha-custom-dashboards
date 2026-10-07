@@ -32,7 +32,7 @@ test('Person is the default and Person and Package separate detections by event 
   assert.match(source, /<span class="badge">0<\/span>/);
   assert.doesNotMatch(source, /data-category="all"|>All</);
 });
-test('tab badges show all-history category totals returned by the timeline API', () => {
+test('tab badges count the selected date snapshots and update when the date changes', () => {
   const c = card();
   const tabs = ['person', 'package'].map(category => ({
     dataset: {category},
@@ -42,10 +42,22 @@ test('tab badges show all-history category totals returned by the timeline API',
   }));
   c.shadowRoot = {querySelectorAll: () => tabs};
   c._category = 'package';
-  c._payload = {counts: {person: 12, package: 7}};
+  c._payload = {
+    counts: {person: 12, package: 7},
+    images: ['Person', 'stranger', 'package_delivered', 'Package Taken', 'package-stranded', 'Motion', 'image_update']
+      .map(label => ({label})),
+  };
   c._syncTabs();
-  assert.deepEqual(tabs.map(tab => tab.badge.textContent), [12, 7]);
+  assert.deepEqual(tabs.map(tab => tab.badge.textContent), [2, 3]);
   assert.deepEqual(tabs.map(tab => tab.tabIndex), [-1, 0]);
+  assert.equal(c._category, 'package');
+  assert.equal(tabs[1].badge.textContent, c._filterImages(c._payload.images).length);
+  c._payload = {images: [{label: 'Person'}]};
+  c._syncTabs();
+  assert.deepEqual(tabs.map(tab => tab.badge.textContent), [1, 0]);
+  c._payload = {images: []};
+  c._syncTabs();
+  assert.deepEqual(tabs.map(tab => tab.badge.textContent), [0, 0]);
 });
 test('late full-image response cannot replace an image after category switch', async () => {
   const c = card();

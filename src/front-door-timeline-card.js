@@ -572,7 +572,9 @@ class FrontDoorTimelineCard extends HTMLElement {
       const active = tab.dataset.category === this._category;
       tab.setAttribute("aria-selected", String(active));
       tab.tabIndex = active ? 0 : -1;
-      tab.querySelector(".badge").textContent = this._payload?.counts?.[tab.dataset.category] ?? 0;
+      tab.querySelector(".badge").textContent = this._filterImages(
+        this._payload?.images || [], tab.dataset.category
+      ).length;
     });
   }
 
@@ -718,10 +720,10 @@ class FrontDoorTimelineCard extends HTMLElement {
     }
   }
 
-  _filterImages(images) {
+  _filterImages(images, category = this._category) {
     return images.filter((item) => {
       const label = String(item.label || "").toLowerCase().replace(/[_-]/g, " ");
-      return this._category === "person"
+      return category === "person"
         ? /^(person|stranger)( |$)/.test(label)
         : /^package( |$)/.test(label);
     });
