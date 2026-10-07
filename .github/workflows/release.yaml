@@ -32,3 +32,4 @@ jobs:
         run: |
           release_version="$(cat VERSION)"
           gh release create "v$release_version" --target "$GITHUB_SHA" --generate-notes --title "v$release_version"
+# Validate and publish the synchronized v1.0.8 bundle.
