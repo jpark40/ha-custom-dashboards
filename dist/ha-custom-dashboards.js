@@ -2425,7 +2425,7 @@ console.info(`%c FRONT-DOOR-TIMELINE %c v${CARD_VERSION} `, "color:white;backgro
 // vehicle-status-card.js
 (() => {
 // HACS package v1.0.0: existing vehicle pages hosted alongside the cards.
-const PACKAGE_VERSION = "1.0.7";
+const PACKAGE_VERSION = "1.0.8";
 class JpVehicleStatusCard extends HTMLElement {
   constructor() { super(); this.attachShadow({mode: "open"}); }
   setConfig(config) {
