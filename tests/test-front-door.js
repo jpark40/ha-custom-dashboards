@@ -72,3 +72,63 @@ test('late full-image response cannot replace an image after category switch', a
   resolve('blob:old-person'); await pending;
   assert.equal(c._els.mainImage.src, undefined);
 });
+
+test('automatic refresh follows the newest date across midnight; chosen history stays pinned', async () => {
+  const c = card();
+  const calls = [];
+  c._load = async (date, preserve) => calls.push({date, preserve});
+  c._selectedDate = '2026-10-18';
+  await c._refresh();
+  assert.equal(calls.at(-1).date, undefined);
+  await c._chooseDate('2026-10-17');
+  c._selectedDate = '2026-10-17';
+  await c._refresh();
+  assert.equal(calls.at(-1).date, '2026-10-17');
+  await c._chooseDate(undefined);
+  await c._refresh();
+  assert.equal(calls.at(-1).date, undefined);
+});
+
+test('polling follows a new frame but preserves a deliberately selected older frame', async () => {
+  const c = card();
+  c.setConfig({});
+  const images = [{id:'older'}, {id:'latest'}];
+  c._images = images;
+  c._els = {overlay:{classList:{contains:()=>false}}, refresh:{}};
+  c._setMessage = () => {};
+  c._syncDateControls = () => {};
+  c._releaseBlobs = () => {};
+  const selections = [];
+  c._renderTimeline = previousId => selections.push(previousId);
+  const requests = [];
+  c._hass = {callApi:async (method, path) => {
+    requests.push(path);
+    return {selected_date:'2026-10-19',images:[...images,{id:'new'}]};
+  }};
+  c._selectedDate = '2026-10-18';
+  c._selectedIndex = 1;
+  await c._refresh();
+  assert.equal(requests.at(-1), 'front_door_timeline');
+  assert.equal(c._selectedDate, '2026-10-19');
+  assert.equal(selections.at(-1), undefined, 'the renderer selects the newest frame');
+  c._selectedIndex = 0;
+  await c._refresh();
+  assert.equal(selections.at(-1), 'older');
+});
+
+test('a stalled Eufy source is shown clearly without warning while browsing history', () => {
+  const c = card();
+  c._payload = {source_status: {event_type:'person',
+    detection_updated:'2026-10-19T12:10:00Z', image_updated:'2026-10-18T23:00:00Z'}};
+  const messages = [];
+  c._setMessage = value => messages.push(value);
+  c._showSourceWarning();
+  assert.match(messages[0], /Eufy reported a newer detection/);
+  c._followLatestDate = false;
+  c._showSourceWarning();
+  assert.equal(messages.length, 1);
+  c._followLatestDate = true;
+  c._payload.source_status.image_updated = '2026-10-19T12:09:59Z';
+  c._showSourceWarning();
+  assert.equal(messages.length, 1);
+});
