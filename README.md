@@ -2,7 +2,13 @@
 
 ![Repository icon](icon.png)
 
-Version 1.0.7 packages the existing Blue Iris v1.1.0, Purobot v1.0.3, and Front Door v1.0.5 cards into one JavaScript module. It includes the latest recovered Mousie and Moo Moo HTML pages. Timeline card names, API routes, settings, and UI behavior are retained. Purobot retains Toilet Used first and the scale-to-fit viewer; Blue Iris retains Delivery, swipe, and zoom. Front Door shows all-history Person and Package counts on its tabs.
+Version 1.0.9 fixes Front Door automatic refresh across midnight and follows new frames while the latest frame is selected. It also explains when images have other labels or when the Eufy image source is stale (with front-door backend 1.0.9). Person and Package tab counts continue to reflect the selected day.
+
+Update through HACS, restart HA after updating the backend integration, then fully
+reload each browser/Fully Kiosk page so it loads the new JavaScript. **Latest**
+enables following the newest date. Choosing a date or using the date arrows pins
+history until Latest is selected again. While viewing the newest frame, incoming
+snapshots replace it automatically; deliberately selected older frames stay put.
 
 ## Install or migrate once
 

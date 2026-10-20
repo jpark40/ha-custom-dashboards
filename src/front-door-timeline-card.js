@@ -8,6 +8,7 @@ class FrontDoorTimelineCard extends HTMLElement {
     this._config = undefined;
     this._payload = undefined;
     this._selectedDate = undefined;
+    this._followLatestDate = true;
     this._selectedIndex = -1;
     this._category = "person";
     this._images = [];
@@ -47,7 +48,7 @@ class FrontDoorTimelineCard extends HTMLElement {
     if (this.isConnected) {
       this._renderShell();
       this._startTimer();
-      if (this._hass) this._load(this._selectedDate);
+      if (this._hass) this._refresh();
     }
   }
 
@@ -62,7 +63,7 @@ class FrontDoorTimelineCard extends HTMLElement {
     if (!this._rendered) this._renderShell();
     if (this._els?.["overlay-stage"]) this._resizeObserver?.observe(this._els["overlay-stage"]);
     this._startTimer();
-    if (this._hass && !this._payload) this._load();
+    if (this._hass) this._refresh();
   }
 
   disconnectedCallback() {
@@ -453,14 +454,14 @@ class FrontDoorTimelineCard extends HTMLElement {
       });
     });
     this._els.date.addEventListener("change", () => {
-      this._load(this._els.date.value || undefined);
+      this._chooseDate(this._els.date.value || undefined);
     });
     this._els.previous.addEventListener("click", () => this._moveDate(-1));
     this._els.next.addEventListener("click", () => this._moveDate(1));
     this._els.latest.addEventListener("click", () => {
-      if (this._payload?.latest_date) this._load(this._payload.latest_date);
+      this._chooseDate(undefined);
     });
-    this._els.refresh.addEventListener("click", () => this._load(this._selectedDate, true));
+    this._els.refresh.addEventListener("click", () => this._refresh());
     this._els.timeline.addEventListener("keydown", (event) => {
       if (event.key === "ArrowLeft") {
         event.preventDefault();
@@ -505,15 +506,26 @@ class FrontDoorTimelineCard extends HTMLElement {
     this._timer = undefined;
     if (!this._config?.refresh_seconds) return;
     this._timer = window.setInterval(
-      () => this._load(this._selectedDate, true),
+      () => this._refresh(),
       this._config.refresh_seconds * 1000
     );
+  }
+
+  _chooseDate(date) {
+    this._followLatestDate = !date;
+    return this._load(date);
+  }
+
+  _refresh() {
+    return this._load(this._followLatestDate ? undefined : this._selectedDate, true);
   }
 
   async _load(date, preserveSelection = false) {
     if (!this._hass || !this._config || !this._els || this._els.overlay.classList.contains("open")) return;
     const generation = ++this._loadGeneration;
-    const previousId = preserveSelection
+    // Follow new arrivals when the viewer was on the newest frame. Preserve a
+    // deliberately selected older frame while the user is browsing history.
+    const previousId = preserveSelection && this._selectedIndex < this._images.length - 1
       ? this._images[this._selectedIndex]?.id
       : undefined;
 
@@ -535,12 +547,24 @@ class FrontDoorTimelineCard extends HTMLElement {
 
       this._syncDateControls();
       this._renderTimeline(previousId);
+      this._showSourceWarning();
     } catch (error) {
       if (generation !== this._loadGeneration) return;
       const detail = error?.message || String(error);
       this._showError(`Could not load the timeline. ${detail}`);
     } finally {
       if (generation === this._loadGeneration) this._els.refresh.disabled = false;
+    }
+  }
+
+  _showSourceWarning() {
+    if (!this._followLatestDate) return;
+    const status = this._payload?.source_status;
+    if (!status || !/^(person|stranger|package_|motion)/.test(status.event_type || "")) return;
+    const detection = Date.parse(status.detection_updated);
+    const image = Date.parse(status.image_updated);
+    if (Number.isFinite(detection) && (!Number.isFinite(image) || detection - image > 300000)) {
+      this._setMessage("Eufy reported a newer detection, but its Last event image has not advanced. Run the timeline's Refresh Eufy event image action; if it stays stale, check the Eufy bridge log.");
     }
   }
 
@@ -551,7 +575,8 @@ class FrontDoorTimelineCard extends HTMLElement {
     this._els.date.min = dates[0] || "";
     this._els.date.max = dates[dates.length - 1] || "";
     this._els.date.disabled = dates.length === 0;
-    this._els.latest.disabled = dates.length === 0 || current === this._payload.latest_date;
+    this._els.latest.disabled = dates.length === 0 ||
+      (this._followLatestDate && current === this._payload.latest_date);
 
     this._els.previous.disabled = !dates.some((item) => item < current);
     this._els.next.disabled = !dates.some((item) => item > current);
@@ -564,7 +589,7 @@ class FrontDoorTimelineCard extends HTMLElement {
       direction < 0 ? item < current : item > current
     );
     const target = direction < 0 ? candidates.at(-1) : candidates[0];
-    if (target) this._load(target);
+    if (target) this._chooseDate(target);
   }
 
   _syncTabs() {
@@ -592,7 +617,11 @@ class FrontDoorTimelineCard extends HTMLElement {
       this._selectedIndex = -1;
       this._els.viewer.hidden = true;
       this._els.timelineWrap.hidden = true;
-      this._setMessage(`No ${this._category} snapshots saved for ${dateLabel}.`);
+      const other = (this._payload?.images || []).filter((item) =>
+        !this._filterImages([item], "person").length &&
+        !this._filterImages([item], "package").length).length;
+      this._setMessage(`No ${this._category} snapshots saved for ${dateLabel}.` +
+        (other ? ` ${other} saved snapshot${other === 1 ? " has" : "s have"} other labels and ${other === 1 ? "is" : "are"} hidden by these tabs.` : ""));
       return;
     }
 
