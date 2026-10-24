@@ -108,7 +108,7 @@ test('polling follows a new frame but preserves a deliberately selected older fr
   c._selectedDate = '2026-10-18';
   c._selectedIndex = 1;
   await c._refresh();
-  assert.equal(requests.at(-1), 'front_door_timeline');
+  assert.equal(requests.at(-1), 'front_door_timeline?category=person');
   assert.equal(c._selectedDate, '2026-10-19');
   assert.equal(selections.at(-1), undefined, 'the renderer selects the newest frame');
   c._selectedIndex = 0;
@@ -131,4 +131,72 @@ test('a stalled Eufy source is shown clearly without warning while browsing hist
   c._payload.source_status.image_updated = '2026-10-19T12:09:59Z';
   c._showSourceWarning();
   assert.equal(messages.length, 1);
+});
+
+test('Latest requests the selected category, while a chosen date stays explicit', async () => {
+  const c = card();
+  c.setConfig({});
+  c._els = {overlay:{classList:{contains:()=>false}}, refresh:{}};
+  c._setMessage = c._syncDateControls = c._renderTimeline = c._releaseBlobs = () => {};
+  const requests = [];
+  c._hass = {callApi: async (method, path) => {
+    requests.push(path);
+    return {selected_date:'2026-10-19', latest_date:'2026-10-19', images:[{label:'Stranger'}]};
+  }};
+  await c._refresh();
+  assert.equal(requests.at(-1), 'front_door_timeline?category=person');
+  c._category = 'package';
+  await c._refresh();
+  assert.equal(requests.at(-1), 'front_door_timeline?category=package');
+  await c._chooseDate('2026-10-23');
+  assert.equal(requests.at(-1), 'front_door_timeline?category=package&date=2026-10-23');
+  assert.equal(c._followLatestDate, false);
+});
+
+test('switching tabs follows that category history, while a chosen date stays pinned', async () => {
+  const c = card();
+  let refreshed = 0, rendered = 0;
+  c._refresh = async () => { refreshed++; };
+  c._closeOverlay = c._syncDateControls = () => {};
+  c._renderTimeline = () => { rendered++; };
+  await c._chooseCategory('package');
+  assert.equal(refreshed, 1);
+  assert.equal(c._category, 'package');
+  c._followLatestDate = false;
+  c._selectedDate = '2026-10-19';
+  await c._chooseCategory('person');
+  assert.equal(refreshed, 1);
+  assert.equal(rendered, 1);
+  assert.equal(c._selectedDate, '2026-10-19');
+});
+
+test('date arrows skip days that only have other labels or the other category', async () => {
+  const c = card();
+  c._payload = {dates:[
+    {date:'2026-10-18', counts:{person:1, package:0}},
+    {date:'2026-10-19', counts:{person:0, package:1}},
+    {date:'2026-10-20', counts:{person:0, package:0}},
+    {date:'2026-10-21', counts:{person:1, package:0}},
+  ]};
+  c._selectedDate = '2026-10-21';
+  const chosen = [];
+  c._chooseDate = date => chosen.push(date);
+  c._moveDate(-1);
+  assert.equal(chosen.at(-1), '2026-10-18');
+  c._category = 'package';
+  c._moveDate(-1);
+  assert.equal(chosen.at(-1), '2026-10-19');
+});
+
+test('an empty folder is distinguished from snapshots hidden by category labels', () => {
+  const c = card();
+  c._payload = {total_count:0};
+  assert.match(c._emptyMessage('today'), /No saved snapshot files/);
+  c._payload = {total_count:3, counts:{person:0, package:0}, hidden_count:3};
+  assert.match(c._emptyMessage('today'), /No person snapshots are classified in saved history/);
+  assert.match(c._emptyMessage('today'), /3 saved snapshots have other labels/);
+  c._followLatestDate = false;
+  c._payload = {total_count:4, counts:{person:1}, images:[{label:'Image Update'}]};
+  assert.match(c._emptyMessage('Oct 23'), /No person snapshots saved for Oct 23/);
+  assert.match(c._emptyMessage('Oct 23'), /Select Latest/);
 });

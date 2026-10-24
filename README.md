@@ -2,13 +2,20 @@
 
 ![Repository icon](icon.png)
 
-Version 1.0.9 fixes Front Door automatic refresh across midnight and follows new frames while the latest frame is selected. It also explains when images have other labels or when the Eufy image source is stale (with front-door backend 1.0.9). Person and Package tab counts continue to reflect the selected day.
+Version 1.0.10 fixes Front Door appearing empty when a newer day has only hidden labels. With front-door backend 1.0.11, Latest opens the newest saved date for the selected Person or Package tab, and date arrows skip dates with no matches. Empty-folder and hidden-label messages are distinct. Person and Package tab counts continue to reflect the selected day.
 
 Update through HACS, restart HA after updating the backend integration, then fully
 reload each browser/Fully Kiosk page so it loads the new JavaScript. **Latest**
-enables following the newest date. Choosing a date or using the date arrows pins
+enables following the newest saved date for the selected tab. Switching tabs
+while following Latest opens that tab's latest date. Choosing a date or using the date arrows pins
 history until Latest is selected again. While viewing the newest frame, incoming
 snapshots replace it automatically; deliberately selected older frames stay put.
+
+If no snapshots appear, update the front-door backend to **1.0.11** too, then run
+**Developer Tools → Actions → Front Door Snapshot Timeline: Timeline diagnostics**
+(`front_door_timeline.diagnostics`, with `data: {}`). Its response distinguishes an
+empty storage folder, captures with hidden labels, and unavailable or renamed
+Eufy source entities without modifying saved images.
 
 ## Install or migrate once
 
