@@ -200,3 +200,36 @@ test('an empty folder is distinguished from snapshots hidden by category labels'
   assert.match(c._emptyMessage('Oct 23'), /No person snapshots saved for Oct 23/);
   assert.match(c._emptyMessage('Oct 23'), /Select Latest/);
 });
+
+test('automatic capture explains an unchanged Eufy image even when its fetch time is newer', () => {
+  const c = card();
+  c._payload = {source_status: {
+    event_type:'person', detection_updated:'2026-10-26T04:37:21Z',
+    image_updated:'2026-10-26T05:22:08Z',
+    capture:{state:'waiting_for_image', label:'person', event_timestamp:'2026-10-26T04:37:21Z'},
+  }};
+  const messages = [];
+  c._setMessage = (message, error) => messages.push({message, error});
+  c._showSourceWarning();
+  assert.match(messages[0].message, /Waiting for Eufy to supply a changed event image/);
+  c._payload.source_status.capture.refresh_error = 'bridge unavailable';
+  c._showSourceWarning();
+  assert.match(messages[1].message, /Refresh request failed: bridge unavailable/);
+  c._followLatestDate = false;
+  c._showSourceWarning();
+  assert.equal(messages.length, 2);
+});
+
+test('automatic capture write errors and restored metadata are shown without hiding history', () => {
+  const c = card();
+  const messages = [];
+  c._setMessage = (message, error) => messages.push({message, error});
+  c._payload = {source_status:{capture:{state:'capture_error',message:'storage unavailable'}}};
+  c._showSourceWarning();
+  assert.match(messages[0].message, /storage unavailable/);
+  assert.equal(messages[0].error, true);
+  c._payload.source_status.capture = {state:'restored_detection',message:'Waiting for a new live detection.'};
+  c._showSourceWarning();
+  assert.match(messages[1].message, /new live detection/);
+  assert.equal(messages[1].error, false);
+});

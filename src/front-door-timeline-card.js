@@ -569,6 +569,20 @@ class FrontDoorTimelineCard extends HTMLElement {
   _showSourceWarning() {
     if (!this._followLatestDate) return;
     const status = this._payload?.source_status;
+    const capture = status?.capture;
+    if (capture?.state === "waiting_for_image") {
+      const stamp = new Date(capture.event_timestamp);
+      const when = Number.isFinite(stamp.getTime()) ? stamp.toLocaleString(this._hass?.locale?.language || undefined) : "the last event";
+      const label = String(capture.label || "Detection").replace(/[_-]/g, " ");
+      this._setMessage(`${label} detected at ${when}. Waiting for Eufy to supply a changed event image.` +
+        (capture.refresh_error ? ` Refresh request failed: ${capture.refresh_error}` : ""));
+      return;
+    }
+    if (["image_unavailable", "capture_error", "journal_error", "restored_detection"].includes(capture?.state)) {
+      this._setMessage(`Automatic capture: ${capture.message}`,
+        ["capture_error", "journal_error"].includes(capture.state));
+      return;
+    }
     if (!status || !/^(person|stranger|package_|motion)/.test(status.event_type || "")) return;
     const detection = Date.parse(status.detection_updated);
     const image = Date.parse(status.image_updated);
