@@ -2,7 +2,7 @@
 
 ![Repository icon](icon.png)
 
-Version 1.0.10 fixes Front Door appearing empty when a newer day has only hidden labels. With front-door backend 1.0.11, Latest opens the newest saved date for the selected Person or Package tab, and date arrows skip dates with no matches. Empty-folder and hidden-label messages are distinct. Person and Package tab counts continue to reflect the selected day.
+Version 1.0.11 shows the Front Door backend's automatic capture status: a detection waiting for changed image bytes, an unavailable source, or a file-writing error. With backend 1.0.12, detections are tracked inside the integration and no longer depend on the old snapshot automation. Latest navigation and the selected day's Person/Package counts are retained.
 
 Update through HACS, restart HA after updating the backend integration, then fully
 reload each browser/Fully Kiosk page so it loads the new JavaScript. **Latest**
@@ -11,7 +11,14 @@ while following Latest opens that tab's latest date. Choosing a date or using th
 history until Latest is selected again. While viewing the newest frame, incoming
 snapshots replace it automatically; deliberately selected older frames stay put.
 
-If no snapshots appear, update the front-door backend to **1.0.11** too, then run
+For the capture repair, install front-door backend **1.0.12**, turn off the old
+**Front Door - Save snapshots to timeline** automation, restart HA, and fully
+reload the dashboard. Automatic capture is enabled by default. It retains each
+live detection's metadata until changed image bytes arrive; a cached-image
+download after restart is not treated as a new detection. The card explains
+when Eufy has not supplied a changed picture. Existing snapshots remain browsable.
+
+If no snapshots appear, run
 **Developer Tools → Actions → Front Door Snapshot Timeline: Timeline diagnostics**
 (`front_door_timeline.diagnostics`, with `data: {}`). Its response distinguishes an
 empty storage folder, captures with hidden labels, and unavailable or renamed
