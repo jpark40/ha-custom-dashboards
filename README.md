@@ -2,7 +2,7 @@
 
 ![Repository icon](icon.png)
 
-Version 1.0.11 shows the Front Door backend's automatic capture status: a detection waiting for changed image bytes, an unavailable source, or a file-writing error. With backend 1.0.12, detections are tracked inside the integration and no longer depend on the old snapshot automation. Latest navigation and the selected day's Person/Package counts are retained.
+Version 1.0.12 shows the Front Door backend's live-video fallback progress, success, and errors. Backend 1.0.13 can decode a frame from the matching camera's live stream when the Eufy Last event image stays unchanged. A successfully saved live frame replaces the stale-image warning. Latest navigation and the selected day's Person/Package counts are retained.
 
 Update through HACS, restart HA after updating the backend integration, then fully
 reload each browser/Fully Kiosk page so it loads the new JavaScript. **Latest**
@@ -11,12 +11,16 @@ while following Latest opens that tab's latest date. Choosing a date or using th
 history until Latest is selected again. While viewing the newest frame, incoming
 snapshots replace it automatically; deliberately selected older frames stay put.
 
-For the capture repair, install front-door backend **1.0.12**, turn off the old
+For the capture repair, install front-door backend **1.0.13**, turn off the old
 **Front Door - Save snapshots to timeline** automation, restart HA, and fully
 reload the dashboard. Automatic capture is enabled by default. It retains each
 live detection's metadata until changed image bytes arrive; a cached-image
 download after restart is not treated as a new detection. The card explains
-when Eufy has not supplied a changed picture. Existing snapshots remain browsable.
+when Eufy has not supplied a changed picture and whether the live camera fallback
+succeeded. The fallback resolves the matching camera by serial (including
+`camera.front_door_2`), briefly opens video for a recent detection, and closes
+the decoder after one frame or a 30-second timeout. It does not recover yesterday's
+missing event thumbnails. Existing snapshots remain browsable.
 
 If no snapshots appear, run
 **Developer Tools → Actions → Front Door Snapshot Timeline: Timeline diagnostics**

@@ -575,7 +575,13 @@ class FrontDoorTimelineCard extends HTMLElement {
       const when = Number.isFinite(stamp.getTime()) ? stamp.toLocaleString(this._hass?.locale?.language || undefined) : "the last event";
       const label = String(capture.label || "Detection").replace(/[_-]/g, " ");
       this._setMessage(`${label} detected at ${when}. Waiting for Eufy to supply a changed event image.` +
+        (capture.fallback_state === "capturing" ? " Capturing a frame from the live camera stream." : "") +
+        (capture.fallback_error ? ` Live camera fallback: ${capture.fallback_error}` : "") +
         (capture.refresh_error ? ` Refresh request failed: ${capture.refresh_error}` : ""));
+      return;
+    }
+    if (["saved", "unchanged"].includes(capture?.state) && capture.image_source === "live_stream") {
+      this._setMessage(`Using a live frame from ${capture.camera_entity || "the front-door camera"}; Eufy's Last event image has not updated.`);
       return;
     }
     if (["image_unavailable", "capture_error", "journal_error", "restored_detection"].includes(capture?.state)) {
