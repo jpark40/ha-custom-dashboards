@@ -233,3 +233,31 @@ test('automatic capture write errors and restored metadata are shown without hid
   assert.match(messages[1].message, /new live detection/);
   assert.equal(messages[1].error, false);
 });
+
+test('live fallback success replaces the stale-event warning and keeps history browseable', () => {
+  const c = card();
+  const messages = [];
+  c._setMessage = message => messages.push(message);
+  c._payload = {source_status:{event_type:'person',
+    detection_updated:'2026-10-27T22:58:26.769Z', image_updated:'2026-10-27T16:43:23.852Z',
+    capture:{state:'saved', image_source:'live_stream', camera_entity:'camera.front_door_2'}}};
+  c._showSourceWarning();
+  assert.match(messages[0], /Using a live frame from camera.front_door_2/);
+  assert.doesNotMatch(messages[0], /Run the timeline/);
+  c._followLatestDate = false;
+  c._showSourceWarning();
+  assert.equal(messages.length, 1);
+});
+
+test('live fallback progress and failure are shown when the primary image stays unchanged', () => {
+  const c = card();
+  const messages = [];
+  c._setMessage = message => messages.push(message);
+  c._payload = {source_status:{capture:{state:'waiting_for_image',label:'person',
+    event_timestamp:'2026-10-27T22:58:26.769Z', fallback_state:'capturing'}}};
+  c._showSourceWarning();
+  assert.match(messages[0], /Capturing a frame from the live camera stream/);
+  Object.assign(c._payload.source_status.capture, {fallback_state:'failed', fallback_error:'Live video produced no frame within 30 seconds'});
+  c._showSourceWarning();
+  assert.match(messages[1], /Live camera fallback: Live video produced no frame/);
+});
