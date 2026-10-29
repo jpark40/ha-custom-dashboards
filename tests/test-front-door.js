@@ -3,12 +3,13 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const source = fs.readFileSync(require('node:path').join(__dirname, '../src/front-door-timeline-card.js'), 'utf8');
-function card() {
+function card(extras = {}) {
   let Card;
   vm.runInNewContext(source, {
     HTMLElement: class { attachShadow() {} },
     customElements: { get() {}, define(name, type) { Card = type; } },
     console: { info() {} },
+    ...extras,
   });
   return new Card();
 }
@@ -201,7 +202,7 @@ test('an empty folder is distinguished from snapshots hidden by category labels'
   assert.match(c._emptyMessage('Oct 23'), /Select Latest/);
 });
 
-test('automatic capture explains an unchanged Eufy image even when its fetch time is newer', () => {
+test('legacy waiting status refers to the requested Last event image', () => {
   const c = card();
   c._payload = {source_status: {
     event_type:'person', detection_updated:'2026-10-26T04:37:21Z',
@@ -211,13 +212,10 @@ test('automatic capture explains an unchanged Eufy image even when its fetch tim
   const messages = [];
   c._setMessage = (message, error) => messages.push({message, error});
   c._showSourceWarning();
-  assert.match(messages[0].message, /Waiting for Eufy to supply a changed event image/);
-  c._payload.source_status.capture.refresh_error = 'bridge unavailable';
-  c._showSourceWarning();
-  assert.match(messages[1].message, /Refresh request failed: bridge unavailable/);
+  assert.match(messages[0].message, /Waiting for the Last event image to become available/);
   c._followLatestDate = false;
   c._showSourceWarning();
-  assert.equal(messages.length, 2);
+  assert.equal(messages.length, 1);
 });
 
 test('automatic capture write errors and restored metadata are shown without hiding history', () => {
@@ -234,30 +232,68 @@ test('automatic capture write errors and restored metadata are shown without hid
   assert.equal(messages[1].error, false);
 });
 
-test('live fallback success replaces the stale-event warning and keeps history browseable', () => {
+test('saved Last event image is not declared failed because its SDK timestamp is old', () => {
   const c = card();
   const messages = [];
   c._setMessage = message => messages.push(message);
   c._payload = {source_status:{event_type:'person',
     detection_updated:'2026-10-27T22:58:26.769Z', image_updated:'2026-10-27T16:43:23.852Z',
-    capture:{state:'saved', image_source:'live_stream', camera_entity:'camera.front_door_2'}}};
-  c._showSourceWarning();
-  assert.match(messages[0], /Using a live frame from camera.front_door_2/);
-  assert.doesNotMatch(messages[0], /Run the timeline/);
-  c._followLatestDate = false;
+    capture:{state:'saved', image_source:'event_image', label:'person',
+      event_timestamp:'2026-10-27T22:58:26.769000+00:00'}}};
+  for (const state of ['saved', 'updated', 'unchanged']) {
+    c._payload.source_status.capture.state = state;
+    c._showSourceWarning();
+  }
+  assert.equal(messages.length, 0);
+  c._payload.source_status.detection_updated = '2026-10-27T22:59:26.769Z';
   c._showSourceWarning();
   assert.equal(messages.length, 1);
+  assert.match(messages[0], /newer detection/);
 });
 
-test('live fallback progress and failure are shown when the primary image stays unchanged', () => {
+test('a late event image is fetched again under the same timeline event ID', async () => {
+  let blobs = 0;
+  const c = card({URL:{createObjectURL:() => `blob:${++blobs}`}});
+  const requests = [];
+  c._hass = {callApiRaw:async (method, path) => {
+    requests.push(path);
+    return {ok:true, blob:async () => ({})};
+  }};
+  const item = {id:'same-event', url:'/api/front_door_timeline/image/event.jpg?v=1'};
+  assert.equal(await c._loadBlob(item), 'blob:1');
+  assert.equal(await c._loadBlob(item), 'blob:1');
+  item.url = '/api/front_door_timeline/image/event.jpg?v=2';
+  assert.equal(await c._loadBlob(item), 'blob:2');
+  assert.equal(requests.length, 2);
+  assert.match(requests[1], /v=2$/);
+});
+
+test('late response from an earlier revision cannot replace the updated event image', async () => {
   const c = card();
-  const messages = [];
-  c._setMessage = message => messages.push(message);
-  c._payload = {source_status:{capture:{state:'waiting_for_image',label:'person',
-    event_timestamp:'2026-10-27T22:58:26.769Z', fallback_state:'capturing'}}};
-  c._showSourceWarning();
-  assert.match(messages[0], /Capturing a frame from the live camera stream/);
-  Object.assign(c._payload.source_status.capture, {fallback_state:'failed', fallback_error:'Live video produced no frame within 30 seconds'});
-  c._showSourceWarning();
-  assert.match(messages[1], /Live camera fallback: Live video produced no frame/);
+  const item = {id:'same-event', url:'/api/image/event.jpg?v=1', date:'2026-10-29',time:'12:00:00',label:'Person'};
+  c._images = [item];
+  let resolve;
+  c._loadBlob = () => new Promise(r => {resolve = r;});
+  const classes = {remove() {}, add() {}};
+  c._els = {timeline:{querySelectorAll:()=>[]},mainImage:{classList:classes},
+    viewerStatus:{classList:classes},stamp:{},overlay:{classList:{contains:()=>false}}};
+  const pending = c._selectIndex(0);
+  c._images = [{...item, url:'/api/image/event.jpg?v=2'}];
+  resolve('blob:old-revision');
+  await pending;
+  assert.equal(c._els.mainImage.src, undefined);
+});
+
+test('polling releases cached blobs when a snapshot image is revised', async () => {
+  const c = card();
+  c.setConfig({});
+  c._selectedDate = '2026-10-29';
+  c._payload = {images:[{id:'event',url:'/api/image/event.jpg?v=1'}]};
+  c._els = {overlay:{classList:{contains:()=>false}},refresh:{}};
+  c._setMessage = c._syncDateControls = c._renderTimeline = () => {};
+  let releases = 0;
+  c._releaseBlobs = () => { releases++; };
+  c._hass = {callApi:async () => ({selected_date:'2026-10-29',images:[{id:'event',url:'/api/image/event.jpg?v=2'}]})};
+  await c._refresh();
+  assert.equal(releases, 1);
 });
