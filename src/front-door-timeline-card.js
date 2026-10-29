@@ -550,7 +550,10 @@ class FrontDoorTimelineCard extends HTMLElement {
       if (generation !== this._loadGeneration) return;
 
       const dateChanged = this._selectedDate !== payload.selected_date;
-      if (dateChanged) this._releaseBlobs();
+      const previousUrls = new Map((this._payload?.images || []).map(item => [item.id, item.url]));
+      const imageUpdated = (payload.images || []).some(item =>
+        previousUrls.has(item.id) && previousUrls.get(item.id) !== item.url);
+      if (dateChanged || imageUpdated) this._releaseBlobs();
       this._payload = payload;
       this._selectedDate = payload.selected_date || date;
 
@@ -574,14 +577,14 @@ class FrontDoorTimelineCard extends HTMLElement {
       const stamp = new Date(capture.event_timestamp);
       const when = Number.isFinite(stamp.getTime()) ? stamp.toLocaleString(this._hass?.locale?.language || undefined) : "the last event";
       const label = String(capture.label || "Detection").replace(/[_-]/g, " ");
-      this._setMessage(`${label} detected at ${when}. Waiting for Eufy to supply a changed event image.` +
-        (capture.fallback_state === "capturing" ? " Capturing a frame from the live camera stream." : "") +
-        (capture.fallback_error ? ` Live camera fallback: ${capture.fallback_error}` : "") +
-        (capture.refresh_error ? ` Refresh request failed: ${capture.refresh_error}` : ""));
+      this._setMessage(`${label} detected at ${when}. Waiting for the Last event image to become available.`);
       return;
     }
-    if (["saved", "unchanged"].includes(capture?.state) && capture.image_source === "live_stream") {
-      this._setMessage(`Using a live frame from ${capture.camera_entity || "the front-door camera"}; Eufy's Last event image has not updated.`);
+    if (["saved", "updated", "unchanged"].includes(capture?.state) &&
+        capture.image_source === "event_image" &&
+        Date.parse(capture.event_timestamp) === Date.parse(status.detection_updated) &&
+        capture.label === status.event_type) {
+      // The image's SDK timestamp need not advance for a detection to be saved.
       return;
     }
     if (["image_unavailable", "capture_error", "journal_error", "restored_detection"].includes(capture?.state)) {
@@ -589,7 +592,7 @@ class FrontDoorTimelineCard extends HTMLElement {
         ["capture_error", "journal_error"].includes(capture.state));
       return;
     }
-    if (!status || !/^(person|stranger|package_|motion)/.test(status.event_type || "")) return;
+    if (!status || !["person", "stranger", "package_delivered", "package_taken"].includes(status.event_type)) return;
     const detection = Date.parse(status.detection_updated);
     const image = Date.parse(status.image_updated);
     if (Number.isFinite(detection) && (!Number.isFinite(image) || detection - image > 300000)) {
@@ -790,13 +793,15 @@ class FrontDoorTimelineCard extends HTMLElement {
 
     try {
       const url = await this._loadBlob(item);
-      if (this._images[this._selectedIndex]?.id !== item.id) return;
+      if (this._images[this._selectedIndex]?.id !== item.id ||
+          this._images[this._selectedIndex]?.url !== item.url) return;
       this._els.mainImage.src = url;
       this._els.mainImage.classList.add("ready");
       this._els.viewerStatus.classList.add("hidden");
       if (this._els.overlay.classList.contains("open")) this._showOverlayImage();
     } catch (error) {
-      if (this._images[this._selectedIndex]?.id !== item.id) return;
+      if (this._images[this._selectedIndex]?.id !== item.id ||
+          this._images[this._selectedIndex]?.url !== item.url) return;
       this._els.viewerStatus.textContent = `Image could not be loaded: ${error?.message || error}`;
       if (this._els.overlay.classList.contains("open")) this._els["overlay-status"].textContent = this._els.viewerStatus.textContent;
     }
@@ -812,8 +817,9 @@ class FrontDoorTimelineCard extends HTMLElement {
   }
 
   async _loadBlob(item) {
-    if (this._blobUrls.has(item.id)) return this._blobUrls.get(item.id);
-    if (this._blobPromises.has(item.id)) return this._blobPromises.get(item.id);
+    const key = item.url;
+    if (this._blobUrls.has(key)) return this._blobUrls.get(key);
+    if (this._blobPromises.has(key)) return this._blobPromises.get(key);
 
     const promise = (async () => {
       const apiPath = item.url.replace(/^\/api\//, "");
@@ -821,15 +827,15 @@ class FrontDoorTimelineCard extends HTMLElement {
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const blob = await response.blob();
       const objectUrl = URL.createObjectURL(blob);
-      this._blobUrls.set(item.id, objectUrl);
+      this._blobUrls.set(key, objectUrl);
       return objectUrl;
     })();
 
-    this._blobPromises.set(item.id, promise);
+    this._blobPromises.set(key, promise);
     try {
       return await promise;
     } finally {
-      this._blobPromises.delete(item.id);
+      this._blobPromises.delete(key);
     }
   }
 

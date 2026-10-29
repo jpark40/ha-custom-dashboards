@@ -2,7 +2,7 @@
 
 ![Repository icon](icon.png)
 
-Version 1.0.12 shows the Front Door backend's live-video fallback progress, success, and errors. Backend 1.0.13 can decode a frame from the matching camera's live stream when the Eufy Last event image stays unchanged. A successfully saved live frame replaces the stale-image warning. Latest navigation and the selected day's Person/Package counts are retained.
+Version **1.0.13** supports the Front Door backend's detection-triggered image capture. Backend **1.0.14** saves `image.front_door_last_event` whenever `event.front_door_detection` reports `person`, `stranger`, `package_delivered`, or `package_taken`. An unchanged image timestamp no longer blocks a detection from appearing. If the image arrives later, the same event is updated and the card fetches its revised image instead of keeping an old cached blob.
 
 Update through HACS, restart HA after updating the backend integration, then fully
 reload each browser/Fully Kiosk page so it loads the new JavaScript. **Latest**
@@ -11,16 +11,14 @@ while following Latest opens that tab's latest date. Choosing a date or using th
 history until Latest is selected again. While viewing the newest frame, incoming
 snapshots replace it automatically; deliberately selected older frames stay put.
 
-For the capture repair, install front-door backend **1.0.13**, turn off the old
+For the capture repair, install front-door backend **1.0.14**, turn off the old
 **Front Door - Save snapshots to timeline** automation, restart HA, and fully
-reload the dashboard. Automatic capture is enabled by default. It retains each
-live detection's metadata until changed image bytes arrive; a cached-image
-download after restart is not treated as a new detection. The card explains
-when Eufy has not supplied a changed picture and whether the live camera fallback
-succeeded. The fallback resolves the matching camera by serial (including
-`camera.front_door_2`), briefly opens video for a recent detection, and closes
-the decoder after one frame or a 30-second timeout. It does not recover yesterday's
-missing event thumbnails. Existing snapshots remain browsable.
+reload the dashboard. Automatic capture is enabled by default and reads the same
+image API as the image entity on your dashboard. A relevant detection saves the
+available image immediately, without opening live video or requiring image bytes
+to change. Repeated callbacks for the same event do not add copies. A different
+detection gets its own entry; a later image update revises that event's existing
+snapshot. Existing snapshots remain browsable.
 
 If no snapshots appear, run
 **Developer Tools → Actions → Front Door Snapshot Timeline: Timeline diagnostics**
@@ -80,11 +78,11 @@ HACS currently uses its external brands source for integration list icons; the o
 
 ## Front door: Eufy SDK migration (1.0.1)
 
-The Front Door card now shows **Person** and **Package** tabs, with Person selected by default. Detection labels from `event.front_door_detection` route person and stranger snapshots to Person and package delivery, taken, or stranded snapshots to Package. The main snapshot and thumbnails fit the complete image without cropping, using the same bounded viewer size as Blue Iris. You can set `initial_category: person` or `package`.
+The Front Door card shows **Person** and **Package** tabs, with Person selected by default. The current backend routes `person` and `stranger` to Person, and `package_delivered` and `package_taken` to Package. The main snapshot and thumbnails fit the complete image without cropping, using the same bounded viewer size as Blue Iris. You can set `initial_category: person` or `package`.
 
-Update this dashboard bundle through HACS, then refresh the browser/clear the Fully Kiosk web cache. Replace your existing timeline capture automation with [the new SDK example](https://github.com/jpark40/ha-front-door-timeline/blob/main/examples/automation.yaml), keeping its existing automation ID. Do not add a second capture automation. The example uses `image.front_door_last_event` and `event.front_door_detection`; it captures on the image timestamp changing, rather than capturing the previous thumbnail as soon as detection fires.
+Update this dashboard bundle through HACS, then fully reload the browser/Fully Kiosk page. With backend 1.0.14, keep the old capture automation disabled. The [optional manual automation](https://github.com/jpark40/ha-front-door-timeline/blob/main/examples/automation.yaml) is only for `auto_capture: false`; it triggers on `event.front_door_detection` and captures `image.front_door_last_event`.
 
-The tabs filter saved snapshot labels: Person includes `person` and `stranger`; Package includes delivered, taken, and stranded events. Old `image_update` or `motion` snapshots do not appear in either tab because their original category was not saved, and cannot be reliably classified retroactively. The card displays saved history and does not need a camera entity. For separate live-view cards, your migrated camera is `camera.front_door_2`.
+The tabs filter saved snapshot labels: Person includes `person` and `stranger`; Package includes package labels, preserving older stranded/package history as well. The current backend does not create new entries for `package_stranded`. Old `image_update` or `motion` snapshots do not appear in either tab because their original category was not saved. The timeline uses the image/detection entities and does not need a camera entity.
 
 ## Front Door touch viewer (1.0.2)
 
